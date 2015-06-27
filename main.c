@@ -45,8 +45,15 @@ int main (int argc, const char **argv) {
     r = NewSpeechChannel(NULL, &g_speech_channel);
     if (r) exit(r);
 
-    const char *hello = "hello world";
-    speak(hello, strlen(hello));
+    while (1) {
+        char buf[1024];
+        char *p;
+
+        p = fgets(buf, sizeof(buf), stdin);
+        if (NULL == p) break;
+
+        speak(buf, strlen(buf));
+    }
 
     shutdown(0, 0);
 }
