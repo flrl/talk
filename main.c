@@ -39,8 +39,16 @@ void shutdown(int immediately, int code) {
     exit(code);
 }
 
+static void interrupt(int pacifier) {
+    if (g_speech_channel && SpeechBusy()) {
+        StopSpeech(g_speech_channel);
+    }
+}
+
 int main (int argc, const char **argv) {
     OSErr r = noErr;
+
+    signal(SIGINT, interrupt);
 
     r = NewSpeechChannel(NULL, &g_speech_channel);
     if (r) exit(r);
