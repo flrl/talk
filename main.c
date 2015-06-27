@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h>
+#include <time.h>
 
 #include <ApplicationServices/ApplicationServices.h>
 
@@ -24,10 +25,13 @@ static void speak (const char *text, size_t len) {
 void shutdown(int immediately, int code) {
     if (g_speech_channel) {
         if (!immediately) {
-            // FIXME wait around for current speech to finish
-            sleep(2);
+            while(SpeechBusy() > 0) {
+                const struct timespec delay = { 0, 2500000000 };
+                nanosleep(&delay, NULL);
+            }
         }
 
+        StopSpeech(g_speech_channel);
         DisposeSpeechChannel(g_speech_channel);
         g_speech_channel = NULL;
     }
