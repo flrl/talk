@@ -51,6 +51,10 @@ int speak(const char *text, size_t len) {
 }
 
 void shush(void) {
+    if (g_buffer) {
+        buffer_empty(g_buffer);
+    }
+
     if (g_speech_channel && SpeechBusy()) {
         StopSpeech(g_speech_channel);
     }
