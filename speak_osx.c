@@ -4,12 +4,13 @@
 #include "speak.h"
 
 static SpeechChannel g_speech_channel = NULL;
+static Buffer *g_buffer = NULL;
 
 static int speak_next(void) {
     char *text;
     size_t len;
 
-    int r = buffer_shift(&text, &len);
+    int r = buffer_shift(g_buffer, &text, &len);
     if (r) return r;
     if (NULL == text) return 0;
 
@@ -34,7 +35,12 @@ int speak(const char *text, size_t len) {
         if (r) return r;
     }
 
-    r = buffer_push(text, len);
+    if (!g_buffer) {
+        g_buffer = buffer_new();
+        if (NULL == g_buffer) return ENOMEM;
+    }
+
+    r = buffer_push(g_buffer, text, len);
     if (r) return r;
 
     if (!SpeechBusy()) {
@@ -62,5 +68,10 @@ void unload(int immediately) {
         StopSpeech(g_speech_channel);
         DisposeSpeechChannel(g_speech_channel);
         g_speech_channel = NULL;
+
+    }
+
+    if (g_buffer) {
+        buffer_delete(&g_buffer);
     }
 }

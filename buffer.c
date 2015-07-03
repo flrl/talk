@@ -1,28 +1,73 @@
 #include <sys/queue.h>
 
 #include <errno.h>
+#include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
-#include <pthread.h>
 
 #include "buffer.h"
 
-typedef struct str_queue_entry {
-    STAILQ_ENTRY(str_queue_entry) entries;
+typedef struct buffer_node {
+    STAILQ_ENTRY(buffer_node) entries;
     size_t len;
     char str[0];
-} StrQueueEntry;
+} BufferNode;
 
-typedef STAILQ_HEAD(str_queue_head, str_queue_entry) StrQueueHead;
+typedef STAILQ_HEAD(buffer_head, buffer_node) BufferHead;
 
-static StrQueueHead g_buffer_head = STAILQ_HEAD_INITIALIZER(g_buffer_head);
-static pthread_mutex_t g_buffer_mutex = PTHREAD_MUTEX_INITIALIZER;
+struct s_buffer {
+    BufferHead head;
+    pthread_mutex_t mutex;
+};
 
-int buffer_push(const char *str, size_t len) {
-    int r = pthread_mutex_lock(&g_buffer_mutex);
+static void _buffer_empty_unlocked(BufferHead *head) {
+    BufferNode *n1 = STAILQ_FIRST(head);
+    while (NULL != n1) {
+        BufferNode *n2 = STAILQ_NEXT(n1, entries);
+        free(n2);
+        n1 = n2;
+    }
+    STAILQ_INIT(head);
+}
+
+Buffer *buffer_new(void) {
+    Buffer *buffer = malloc(sizeof *buffer);
+    if (NULL == buffer) return NULL;
+
+    STAILQ_INIT(&buffer->head);
+    pthread_mutex_init(&buffer->mutex, NULL);
+
+    return buffer;
+}
+
+void buffer_delete(Buffer **buffer) {
+    Buffer *tmp = *buffer;
+
+    pthread_mutex_lock(&tmp->mutex);
+
+    *buffer = NULL;
+
+    _buffer_empty_unlocked(&tmp->head);
+
+    pthread_mutex_unlock(&tmp->mutex);
+    pthread_mutex_destroy(&tmp->mutex);
+    free(tmp);
+}
+
+int buffer_empty(Buffer *buffer) {
+    int r = pthread_mutex_lock(&buffer->mutex);
     if (r) return r;
 
-    StrQueueEntry *node = malloc(sizeof(StrQueueEntry) + len + 1);
+    _buffer_empty_unlocked(&buffer->head);
+
+    return pthread_mutex_unlock(&buffer->mutex);
+}
+
+int buffer_push(Buffer *buffer, const char *str, size_t len) {
+    int r = pthread_mutex_lock(&buffer->mutex);
+    if (r) return r;
+
+    BufferNode *node = malloc(sizeof(BufferNode) + len + 1);
     if (NULL == node) {
         r = ENOMEM;
         goto cleanup;
@@ -31,18 +76,18 @@ int buffer_push(const char *str, size_t len) {
     node->len = len;
     strncpy(node->str, str, len + 1);
 
-    STAILQ_INSERT_TAIL(&g_buffer_head, node, entries);
+    STAILQ_INSERT_TAIL(&buffer->head, node, entries);
 
 cleanup:
-    pthread_mutex_unlock(&g_buffer_mutex);
+    pthread_mutex_unlock(&buffer->mutex);
     return r;
 }
 
-int buffer_shift(char **str, size_t *len) {
-    int r = pthread_mutex_lock(&g_buffer_mutex);
+int buffer_shift(Buffer *buffer, char **str, size_t *len) {
+    int r = pthread_mutex_lock(&buffer->mutex);
     if (r) return r;
 
-    StrQueueEntry *node = STAILQ_FIRST(&g_buffer_head);
+    BufferNode *node = STAILQ_FIRST(&buffer->head);
     if (NULL == node) {
         *str = NULL;
         *len = 0;
@@ -58,10 +103,10 @@ int buffer_shift(char **str, size_t *len) {
     }
 
     *len = node->len;
-    STAILQ_REMOVE_HEAD(&g_buffer_head, entries);
+    STAILQ_REMOVE_HEAD(&buffer->head, entries);
     free(node);
 
 cleanup:
-    pthread_mutex_unlock(&g_buffer_mutex);
+    pthread_mutex_unlock(&buffer->mutex);
     return r;
 }
