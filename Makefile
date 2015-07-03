@@ -1,4 +1,5 @@
 LDFLAGS = -framework ApplicationServices
+CFLAGS = -g -O0
 
 all: talk
 
