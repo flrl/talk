@@ -36,7 +36,7 @@ static int talk(FILE *stream) {
     const int interactive = isatty(fileno(stream));
 
     while (!feof(stream)) {
-        char buf[1024];
+        char buf[65536];
         char *p;
 
         if (!interactive && g_interrupted) {
