@@ -75,7 +75,30 @@ int main (int argc, const char **argv) {
 
     sigaction(SIGINT, &action, NULL);
 
-    talk(stdin);
+    int r = 0;
 
-    shutdown(0, 0);
+    if (argc > 1) {
+        for (int i = 1; i < argc; i++) {
+            if (0 == strcmp(argv[i], "-")) {
+                r = talk(stdin);
+            }
+            else {
+                FILE *f = fopen(argv[i], "r");
+
+                if (NULL == f) {
+                    perror(argv[i]);
+                    r = errno;
+                    break;
+                }
+
+                r = talk(f);
+                fclose(f);
+            }
+        }
+    }
+    else {
+        r = talk(stdin);
+    }
+
+    shutdown(0, r);
 }
