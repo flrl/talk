@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "speak.h"
 
@@ -32,11 +33,16 @@ static void signal_handler(int signum) {
 }
 
 static int talk(FILE *stream) {
+    const int interactive = isatty(fileno(stream));
+
     while (!feof(stream)) {
         char buf[1024];
         char *p;
 
-        if (g_interrupted > 1) {
+        if (!interactive && g_interrupted) {
+            shutdown(1, 128 + SIGINT);
+        }
+        else if (g_interrupted > 1) {
             shutdown(1, 128 + SIGINT);
         }
         else if (g_interrupted == 1) {
