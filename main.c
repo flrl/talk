@@ -31,15 +31,8 @@ static void signal_handler(int signum) {
     errno = orig_errno;
 }
 
-int main (int argc, const char **argv) {
-    struct sigaction action;
-    action.sa_handler = signal_handler;
-    sigemptyset(&action.sa_mask);
-    action.sa_flags = 0;
-
-    sigaction(SIGINT, &action, NULL);
-
-    while (!feof(stdin)) {
+static int talk(FILE *stream) {
+    while (!feof(stream)) {
         char buf[1024];
         char *p;
 
@@ -50,9 +43,9 @@ int main (int argc, const char **argv) {
             shush();
         }
 
-        p = fgets(buf, sizeof(buf), stdin);
+        p = fgets(buf, sizeof(buf), stream);
         if (NULL == p) {
-            if (ferror(stdin)) {
+            if (ferror(stream)) {
                 if (errno != EINTR) {
                     perror("fgets");
                     break;
@@ -64,6 +57,19 @@ int main (int argc, const char **argv) {
             speak(buf, strlen(buf));
         }
     }
+
+    return 0;
+}
+
+int main (int argc, const char **argv) {
+    struct sigaction action;
+    action.sa_handler = signal_handler;
+    sigemptyset(&action.sa_mask);
+    action.sa_flags = 0;
+
+    sigaction(SIGINT, &action, NULL);
+
+    talk(stdin);
 
     shutdown(0, 0);
 }
