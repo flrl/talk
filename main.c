@@ -34,15 +34,21 @@ static void signal_handler(int signum) {
 
 static int talk(FILE *stream) {
     const int interactive = isatty(fileno(stream));
+    struct sigaction action, old_action;
+
+    if (interactive) {
+        action.sa_handler = signal_handler;
+        sigemptyset(&action.sa_mask);
+        action.sa_flags = 0;
+
+        sigaction(SIGINT, &action, &old_action);
+    }
 
     while (!feof(stream)) {
         char buf[65536];
         char *p;
 
-        if (!interactive && g_interrupted) {
-            shutdown(1, 128 + SIGINT);
-        }
-        else if (g_interrupted > 1) {
+        if (g_interrupted > 1) {
             shutdown(1, 128 + SIGINT);
         }
         else if (g_interrupted == 1) {
@@ -64,17 +70,14 @@ static int talk(FILE *stream) {
         }
     }
 
+    if (interactive) {
+        sigaction(SIGINT, &old_action, NULL);
+    }
+
     return 0;
 }
 
 int main (int argc, const char **argv) {
-    struct sigaction action;
-    action.sa_handler = signal_handler;
-    sigemptyset(&action.sa_mask);
-    action.sa_flags = 0;
-
-    sigaction(SIGINT, &action, NULL);
-
     int r = 0;
 
     if (argc > 1) {
